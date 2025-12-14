@@ -2,3 +2,4 @@
 .idea
 __init__*.
 *.cpython-*
+.env
