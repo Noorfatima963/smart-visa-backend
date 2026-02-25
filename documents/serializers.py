@@ -20,9 +20,11 @@ class UserDocumentSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'definition_slug', 'document_name', 'file', 
             'status', 'status_display', 'rejection_reason',
-            'issue_date', 'expiry_date', 'verified_at', 'updated_at'
+            'issue_date', 'expiry_date', 'verified_at', 'updated_at',
+            'ai_status', 'ai_extracted_data', 'ai_rejection_reason', 'ai_confidence_score'
         ]
-        read_only_fields = ['id', 'status', 'rejection_reason', 'verified_at', 'updated_at']
+        read_only_fields = ['id', 'status', 'rejection_reason', 'verified_at', 'updated_at', 
+                            'ai_status', 'ai_extracted_data', 'ai_rejection_reason', 'ai_confidence_score']
 
     def create(self, validated_data):
         slug = validated_data.pop('definition_slug')
@@ -44,5 +46,10 @@ class UserDocumentSerializer(serializers.ModelSerializer):
         if not created and doc.status in ['REJECTED', 'MISSING']:
             doc.status = 'PENDING'
             doc.save()
+            
+        # Trigger Background AI Processing if a file is present
+        if doc.file:
+            from .ai_service import submit_ai_verification
+            submit_ai_verification(doc)
             
         return doc

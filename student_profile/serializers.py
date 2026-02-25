@@ -48,8 +48,11 @@ class StudentProfileSerializer(serializers.ModelSerializer):
         many=True, read_only=True)
     financial_profile = StudentFinancialProfileSerializer(read_only=True)
     user = UserSerializer(read_only=True)
+    
+    readiness_score = serializers.ReadOnlyField()
+    readiness_next_step = serializers.ReadOnlyField()
 
     class Meta:
         model = StudentProfile
         fields = '__all__'
-        read_only_fields = ('created_at', 'updated_at')
+        read_only_fields = ('created_at', 'updated_at', 'readiness_score', 'readiness_next_step')
