@@ -117,6 +117,22 @@ class UserDocument(models.Model):
     )
     verified_at = models.DateTimeField(null=True, blank=True)
 
+    # AI Verification
+    class AIStatusChoice(models.TextChoices):
+        PENDING = 'PENDING', _('Pending')
+        PROCESSING = 'PROCESSING', _('Processing')
+        PASSED = 'PASSED', _('Passed')
+        FAILED = 'FAILED', _('Failed')
+
+    ai_status = models.CharField(
+        max_length=20,
+        choices=AIStatusChoice.choices,
+        default=AIStatusChoice.PENDING
+    )
+    ai_extracted_data = models.JSONField(null=True, blank=True, help_text="Data extracted by Gemini LLM")
+    ai_rejection_reason = models.TextField(blank=True, null=True, help_text="Reason if AI verification failed")
+    ai_confidence_score = models.FloatField(null=True, blank=True, help_text="AI confidence percentage (0-100)")
+
     # Critical Dates (For Visa Logic)
     issue_date = models.DateField(null=True, blank=True)
     expiry_date = models.DateField(null=True, blank=True)

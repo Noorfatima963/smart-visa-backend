@@ -42,6 +42,84 @@ class StudentProfile(models.Model):
     def __str__(self):
         return f"{self.user.email}'s Profile"
 
+    @property
+    def readiness_score(self):
+        score = 0
+        
+        # 1. Basic Details (15%)
+        if self.first_name and self.date_of_birth and self.nationality:
+            score += 15
+            
+        # 2. Education (20%)
+        if self.education_history.exists():
+            score += 20
+            
+        # 3. Test Scores (15%)
+        if self.test_scores.exists():
+            score += 15
+            
+        # 4. Financial Info (15%)
+        financial = getattr(self, 'financial_profile', None)
+        if financial and financial.approx_savings and financial.approx_savings > 0:
+            score += 15
+        
+        # 5. Document Checker Integration (20%)
+        # Calculate ratio of uploaded mandatory documents
+        from documents.models import DocumentDefinition, UserDocument
+        mandatory_docs = DocumentDefinition.objects.filter(is_mandatory=True)
+        total_mandatory = mandatory_docs.count()
+        
+        if total_mandatory > 0:
+            uploaded_mandatory = UserDocument.objects.filter(
+                user=self.user,
+                document_definition__in=mandatory_docs,
+                status__in=[UserDocument.StatusChoice.VERIFIED, UserDocument.StatusChoice.PENDING]
+            ).count()
+            
+            doc_ratio = uploaded_mandatory / total_mandatory
+            score += int(20 * doc_ratio)
+        else:
+            # If no mandatory documents are defined in the system yet, grant full 20%
+            score += 20
+            
+        # 6. Passport Details (15%)
+        if self.passport_number:
+            score += 15
+            
+        return score
+
+    @property
+    def readiness_next_step(self):
+        if not (self.first_name and self.date_of_birth and self.nationality):
+            return "Complete your Personal Details (Date of Birth, Nationality) to boost your score."
+        if not self.education_history.exists():
+            return "Add your latest Education History to move forward securely."
+        if not self.test_scores.exists():
+            return "Add your IELTS, PTE, or English Test Score to increase your admission chances."
+            
+        financial = getattr(self, 'financial_profile', None)
+        if not financial or not financial.approx_savings or financial.approx_savings <= 0:
+            return "Add your Financial Details or Bank Statement to reach top readiness."
+        
+        # Document Checker Integration
+        from documents.models import DocumentDefinition, UserDocument
+        mandatory_docs = DocumentDefinition.objects.filter(is_mandatory=True)
+        
+        for doc_def in mandatory_docs:
+            has_uploaded = UserDocument.objects.filter(
+                user=self.user,
+                document_definition=doc_def,
+                status__in=[UserDocument.StatusChoice.VERIFIED, UserDocument.StatusChoice.PENDING]
+            ).exists()
+            
+            if not has_uploaded:
+                return f"Upload your {doc_def.name} to continue your application."
+            
+        if not self.passport_number:
+            return "Add your Passport Number to complete your full visa profile."
+            
+        return "You're all set!"
+
 class Education(models.Model):
     LEVEL_CHOICES = [
         ('high_school', 'High School / A-Levels'),

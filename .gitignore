@@ -1,6 +1,8 @@
 .venv
 .idea
 __init__*.
+temp_auto_push.bat
 *.cpython-*
 .env
-media/*
+media/*.gitignore
+temp_interactive_push.bat

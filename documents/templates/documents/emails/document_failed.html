@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            line-height: 1.6;
+            color: #333333;
+            background-color: #f9f9f9;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: #ffffff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+        }
+
+        .header {
+            text-align: center;
+            border-bottom: 2px solid #e2e8f0;
+            padding-bottom: 20px;
+            margin-bottom: 20px;
+        }
+
+        .error-icon {
+            color: #ef4444;
+            font-size: 48px;
+            margin-bottom: 10px;
+        }
+
+        h1 {
+            color: #1f2937;
+            margin: 0;
+            font-size: 24px;
+        }
+
+        .content {
+            margin-bottom: 30px;
+        }
+
+        .reason-box {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            border-radius: 6px;
+            padding: 15px;
+            margin-top: 20px;
+            color: #991b1b;
+        }
+
+        .footer {
+            text-align: center;
+            color: #64748b;
+            font-size: 12px;
+            border-top: 1px solid #e2e8f0;
+            padding-top: 20px;
+        }
+
+        .btn {
+            display: inline-block;
+            background-color: #ef4444;
+            color: white;
+            padding: 10px 20px;
+            text-decoration: none;
+            border-radius: 5px;
+            font-weight: bold;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="error-icon">⚠</div>
+            <h1>Document Verification Failed</h1>
+        </div>
+
+        <div class="content">
+            <p>Hi {{ user.first_name|default:"there" }},</p>
+            <p>We encountered an issue while our AI system was attempting to verify your uploaded <strong>{{
+                    document_name }}</strong>.</p>
+
+            <div class="reason-box">
+                <p style="margin-top:0; font-weight:bold;">Reason for rejection:</p>
+                <p style="margin-bottom:0;">{{ rejection_reason }}</p>
+            </div>
+
+            <p>Don't worry! You can easily try again. Please ensure your document is fully visible, not blurry, and
+                correctly matches the required document type.</p>
+
+            <div style="text-align: center;">
+                <a href="{{ dashboard_url }}" class="btn">Upload Document Again</a>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>If you believe this is an error, please contact our support team.</p>
+            <p>This is an automated message from Smart Visa. Please do not reply directly to this email.</p>
+        </div>
+    </div>
+</body>
+
+</html>
