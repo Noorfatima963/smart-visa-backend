@@ -22,6 +22,8 @@ urlpatterns = [
     path('api/users/', include('users.urls')),
     path('api/profile/', include('student_profile.urls')),
     path('api/documents/', include('documents.urls')),
+    path('api/universities/', include('universities.urls')),
+    path('api/assessments/', include('assessments.urls')),
 ]
 
 from django.conf import settings

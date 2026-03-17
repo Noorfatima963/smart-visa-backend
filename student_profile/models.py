@@ -14,6 +14,10 @@ class StudentProfile(models.Model):
     gender = models.CharField(max_length=10, choices=GENDER_CHOICES)
     marital_status = models.CharField(max_length=20, choices=MARITAL_STATUS, default='single')
 
+    # Target Study Details
+    target_country = models.CharField(max_length=100, blank=True, null=True, help_text="Target Country for Study")
+    target_degree_type = models.CharField(max_length=100, blank=True, null=True, help_text="Target Degree Type")
+
     # Nationality & Location
     nationality = models.CharField(max_length=100, help_text="Country of Citizenship")
     residence_country = models.CharField(max_length=100, help_text="Country of Residence")

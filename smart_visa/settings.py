@@ -30,7 +30,7 @@ SECRET_KEY = 'django-insecure-b-%%7+x9ph3rniil%s==8#mt#b8t9-d4--7%s8+pdmg&fez@ho
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*'] #Hosted Domain of Backend
 
 
 # Application definition
@@ -45,6 +45,8 @@ LOCAL_APPS = [
     'users',
     'student_profile',
     'documents',
+    'universities',
+    'assessments',
 ]
 
 INSTALLED_APPS = [
@@ -161,7 +163,7 @@ REST_FRAMEWORK = {
 }
 
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
+    'ACCESS_TOKEN_LIFETIME': timedelta(days=30),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
     'ROTATE_REFRESH_TOKENS': False,
     'BLACKLIST_AFTER_ROTATION': False,
