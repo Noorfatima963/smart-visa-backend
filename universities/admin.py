@@ -19,8 +19,8 @@ class UniversityAdmin(admin.ModelAdmin):
         'name', 'university_type', 'city', 'state_province',
         'qs_world_ranking', 'us_news_ranking', 'offers_financial_aid', 'program_count'
     ]
-    list_filter = ['university_type', 'state_province', 'offers_financial_aid']
-    search_fields = ['name', 'city', 'state_province']
+    list_filter = ['university_type', 'country', 'offers_financial_aid']
+    search_fields = ['name', 'city', 'state_province', 'country']
     inlines = [UniversityProgramInline]
     readonly_fields = ['created_at', 'updated_at']
 
