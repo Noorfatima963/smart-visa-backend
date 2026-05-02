@@ -6,3 +6,5 @@ temp_auto_push.bat
 .env
 media/*.gitignore
 temp_interactive_push.bat
+.idea
+media/*

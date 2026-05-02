@@ -5,5 +5,5 @@ from .models import StudentProfile
 
 @receiver(post_save, sender=settings.AUTH_USER_MODEL)
 def create_student_profile(sender, instance, created, **kwargs):
-    if created:
+    if created and not instance.is_superuser and not instance.is_staff:
         StudentProfile.objects.create(user=instance)
