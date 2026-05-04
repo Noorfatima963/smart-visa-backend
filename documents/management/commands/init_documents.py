@@ -82,6 +82,7 @@ class Command(BaseCommand):
                 'country': 'ALL',
                 'phase': 'VISA',
                 'is_mandatory': True,
+                'requires_ai_extraction': False,
             },
             {
                 'name': 'Statement of Purpose (SOP)',

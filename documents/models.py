@@ -56,6 +56,10 @@ class DocumentDefinition(models.Model):
     )
     is_mandatory = models.BooleanField(default=True)
     requires_original = models.BooleanField(default=False)
+    requires_ai_extraction = models.BooleanField(
+        default=True, 
+        help_text="If true, document will be sent to Gemini for metadata extraction and verification."
+    )
     
     # Metadata for reminders
     validity_months = models.PositiveIntegerField(
