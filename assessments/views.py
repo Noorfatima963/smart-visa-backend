@@ -24,6 +24,7 @@ from .cost_estimator import (
     VISA_FEES,
     INSURANCE_COSTS,
 )
+from .compare import compare_programs
 
 
 class RunAssessmentView(APIView):
@@ -50,11 +51,11 @@ class RunAssessmentView(APIView):
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-        data               = serializer.validated_data
-        target_country     = data['target_country']
+        data = serializer.validated_data
+        target_country = data['target_country']
         target_degree_type = data['target_degree_type']
-        target_field       = data.get('target_field', '')
-        max_results        = data.get('max_results', 20)
+        target_field = data.get('target_field', '')
+        max_results = data.get('max_results', 20)
 
         try:
             django_profile = request.user.profile
@@ -64,10 +65,10 @@ class RunAssessmentView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        student         = build_student_profile(django_profile)
+        student = build_student_profile(django_profile)
         missing_factors = get_missing_factors(student)
 
-        financial   = getattr(django_profile, 'financial_profile', None)
+        financial = getattr(django_profile, 'financial_profile', None)
         savings_usd = float(financial.approx_savings or 0) if financial else 0.0
         has_sponsor = financial.has_sponsor if financial else False
 
@@ -106,24 +107,24 @@ class RunAssessmentView(APIView):
         # Run scoring + cost for every program
         results = []
         for program in programs:
-            req   = build_program_requirements(program)
+            req = build_program_requirements(program)
             score = calculate_probability(student, req)
-            cost  = calculate_cost(program, target_country, savings_usd, has_sponsor)
+            cost = calculate_cost(program, target_country, savings_usd, has_sponsor)
             results.append((score, cost, program))
 
         results.sort(key=lambda r: r[0].probability_score, reverse=True)
 
-        top_scores    = [r[0].probability_score for r in results[:5]]
+        top_scores = [r[0].probability_score for r in results[:5]]
         overall_score = round(sum(top_scores) / len(top_scores), 1) if top_scores else 0
         matches_found = sum(1 for r in results if r[0].probability_score >= 50)
 
         scored = [r[0] for r in results]
         score_breakdown = {
-            'gpa':             round(sum(r.gpa_score for r in scored) / len(scored), 1),
-            'language':        round(sum(r.language_score for r in scored) / len(scored), 1),
-            'financial':       round(sum(r.financial_score for r in scored) / len(scored), 1),
-            'backlogs':        round(sum(r.backlog_score for r in scored) / len(scored), 1),
-            'visa_history':    round(sum(r.visa_history_score for r in scored) / len(scored), 1),
+            'gpa': round(sum(r.gpa_score for r in scored) / len(scored), 1),
+            'language': round(sum(r.language_score for r in scored) / len(scored), 1),
+            'financial': round(sum(r.financial_score for r in scored) / len(scored), 1),
+            'backlogs': round(sum(r.backlog_score for r in scored) / len(scored), 1),
+            'visa_history': round(sum(r.visa_history_score for r in scored) / len(scored), 1),
             'acceptance_rate': round(sum(r.acceptance_rate_score for r in scored) / len(scored), 1),
         }
 
@@ -141,8 +142,8 @@ class RunAssessmentView(APIView):
             missing_factors=missing_factors,
         )
 
-        top_results    = results[:max_results]
-        match_objects  = []
+        top_results = results[:max_results]
+        match_objects = []
         for rank, (score_result, cost_result, program) in enumerate(top_results, start=1):
             match_objects.append(UniversityMatch(
                 assessment=assessment,
@@ -172,7 +173,7 @@ class AssessmentHistoryView(APIView):
 
     def get(self, request):
         assessments = VisaAssessment.objects.filter(user=request.user)
-        serializer  = VisaAssessmentListSerializer(assessments, many=True)
+        serializer = VisaAssessmentListSerializer(assessments, many=True)
         return Response({'count': assessments.count(), 'results': serializer.data})
 
 
@@ -222,7 +223,7 @@ class ProgramCostEstimateView(APIView):
             )
 
         try:
-            financial   = request.user.profile.financial_profile
+            financial = request.user.profile.financial_profile
             savings_usd = float(financial.approx_savings or 0)
             has_sponsor = financial.has_sponsor
         except Exception:
@@ -260,13 +261,149 @@ class CountryCostInfoView(APIView):
 
 def _build_profile_snapshot(student) -> dict:
     return {
-        'gpa':              student.gpa,
-        'backlogs':         student.backlogs,
-        'ielts':            student.ielts,
-        'toefl':            student.toefl,
-        'pte':              student.pte,
-        'duolingo':         student.duolingo,
-        'savings_usd':      student.savings_usd,
-        'has_sponsor':      student.has_sponsor,
+        'gpa': student.gpa,
+        'backlogs': student.backlogs,
+        'ielts': student.ielts,
+        'toefl': student.toefl,
+        'pte': student.pte,
+        'duolingo': student.duolingo,
+        'savings_usd': student.savings_usd,
+        'has_sponsor': student.has_sponsor,
         'has_visa_refusal': student.has_visa_refusal,
     }
+
+
+class UniversityCompareView(APIView):
+    """
+    POST /api/assessments/compare/
+
+    Compare two university programs head-to-head against the student's profile.
+
+    Request body:
+    {
+        "program_a_id": 101,
+        "program_b_id": 204
+    }
+
+    Returns per-metric winners, probability scores, cost breakdown, and an AI verdict.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        program_a_id = request.data.get('program_a_id')
+        program_b_id = request.data.get('program_b_id')
+
+        if not program_a_id or not program_b_id:
+            return Response(
+                {'error': 'Both program_a_id and program_b_id are required.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if program_a_id == program_b_id:
+            return Response(
+                {'error': 'program_a_id and program_b_id must be different programs.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            program_a = UniversityProgram.objects.select_related('university').get(pk=program_a_id)
+        except UniversityProgram.DoesNotExist:
+            return Response({'error': f'Program {program_a_id} not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            program_b = UniversityProgram.objects.select_related('university').get(pk=program_b_id)
+        except UniversityProgram.DoesNotExist:
+            return Response({'error': f'Program {program_b_id} not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            django_profile = request.user.profile
+        except Exception:
+            return Response(
+                {'error': 'Student profile not found. Please complete your profile first.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        result = compare_programs(program_a, program_b, django_profile)
+        return Response(result, status=status.HTTP_200_OK)
+
+
+class ProgramSearchView(APIView):
+    """
+    GET /api/assessments/programs/search/
+
+    Search programs to find IDs for the compare endpoint.
+
+    Query params (all optional):
+        q           — keyword search on program name / university name
+        country     — e.g. USA, UK, Canada, Australia, Germany
+        degree_type — Masters | Bachelors | Phd | Diploma
+        field       — e.g. Computer Science
+        university  — partial university name
+        page        — page number (default 1)
+        page_size   — results per page (default 20, max 50)
+
+    Example:
+        GET /api/assessments/programs/search/?country=USA&degree_type=Masters&field=Computer Science
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        qs = UniversityProgram.objects.select_related('university').all()
+
+        q = request.query_params.get('q', '').strip()
+        country = request.query_params.get('country', '').strip()
+        degree_type = request.query_params.get('degree_type', '').strip()
+        field = request.query_params.get('field', '').strip()
+        university = request.query_params.get('university', '').strip()
+
+        if q:
+            qs = qs.filter(
+                Q(program_name__icontains=q) |
+                Q(university__name__icontains=q)
+            )
+        if country:
+            qs = qs.filter(university__country__iexact=country)
+        if degree_type:
+            qs = qs.filter(degree_type=degree_type)
+        if field:
+            qs = qs.filter(
+                Q(program_name__icontains=field) |
+                Q(department__icontains=field)
+            )
+        if university:
+            qs = qs.filter(university__name__icontains=university)
+
+        # Pagination
+        try:
+            page = max(int(request.query_params.get('page', 1)), 1)
+            page_size = min(int(request.query_params.get('page_size', 20)), 50)
+        except ValueError:
+            page, page_size = 1, 20
+
+        total = qs.count()
+        offset = (page - 1) * page_size
+        items = qs[offset: offset + page_size]
+
+        results = [
+            {
+                'program_id': p.id,
+                'university_name': p.university.name,
+                'program_name': p.program_name,
+                'degree_type': p.degree_type,
+                'country': p.university.country,
+                'city': p.university.city,
+                'qs_ranking': p.university.qs_world_ranking,
+                'tuition_per_year': float(p.tuition_fee_per_year or 0),
+                'ielts_required': p.ielts_required,
+                'acceptance_rate': p.acceptance_rate,
+            }
+            for p in items
+        ]
+
+        return Response({
+            'total': total,
+            'page': page,
+            'page_size': page_size,
+            'pages': (total + page_size - 1) // page_size,
+            'results': results,
+        })

@@ -16,4 +16,8 @@ urlpatterns = [
     # Get fixed visa + insurance info for a country
     # GET /api/assessments/cost-info/USA/
     path('cost-info/<str:country>/', views.CountryCostInfoView.as_view(), name='country-cost-info'),
+
+    # ── University comparison (Uni Clash) ──────────────────────────────────────
+    path('compare/',            views.UniversityCompareView.as_view(), name='university-compare'),
+    path('programs/search/',    views.ProgramSearchView.as_view(),     name='program-search'),
 ]
