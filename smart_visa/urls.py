@@ -24,6 +24,7 @@ urlpatterns = [
     path('api/documents/', include('documents.urls')),
     path('api/universities/', include('universities.urls')),
     path('api/assessments/', include('assessments.urls')),
+    path('api/chatbot/',    include('chatbot.urls')),
 ]
 
 from django.conf import settings
