@@ -8,3 +8,6 @@ media/*.gitignore
 temp_interactive_push.bat
 .idea
 media/*
+media
+.gitignore
+db.sqlite3
