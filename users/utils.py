@@ -5,6 +5,7 @@ from django.conf import settings
 from django.contrib.auth.tokens import default_token_generator
 from django.utils.http import urlsafe_base64_encode
 from django.utils.encoding import force_bytes
+import random
 
 def send_verification_email(user, request=None):
     """
@@ -44,6 +45,28 @@ def send_verification_email(user, request=None):
         text_content,
         settings.EMAIL_HOST_USER, # From email
         [user.email] # To email
+    )
+    email.attach_alternative(html_content, "text/html")
+    email.send()
+
+
+def generate_otp():
+    return f"{random.randint(1000, 9999)}"
+
+
+def send_otp_email(user, otp):
+    subject = 'Your SmartVisa Verification Code'
+    html_content = render_to_string('emails/otp_email.html', {
+        'user': user,
+        'otp': otp,
+    })
+    text_content = strip_tags(html_content)
+
+    email = EmailMultiAlternatives(
+        subject,
+        text_content,
+        settings.EMAIL_HOST_USER,
+        [user.email]
     )
     email.attach_alternative(html_content, "text/html")
     email.send()

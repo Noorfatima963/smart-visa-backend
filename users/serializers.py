@@ -36,6 +36,41 @@ class EmailVerificationSerializer(serializers.Serializer):
     uid = serializers.CharField()
     token = serializers.CharField()
 
+
+class MobileRegisterSerializer(serializers.ModelSerializer):
+    password = serializers.CharField(write_only=True, required=True, validators=[validate_password])
+
+    class Meta:
+        model = CustomUser
+        fields = ('first_name', 'last_name', 'email', 'phone_number', 'password')
+        extra_kwargs = {
+            'first_name': {'required': True},
+            'last_name': {'required': True},
+            'email': {'required': True},
+            'phone_number': {'required': False, 'allow_null': True, 'allow_blank': True},
+        }
+
+    def create(self, validated_data):
+        password = validated_data.pop('password')
+        user = CustomUser.objects.create_user(password=password, **validated_data)
+        try:
+            student_group = Group.objects.get(name='Student')
+            user.groups.add(student_group)
+        except Group.DoesNotExist:
+            pass
+        user.is_active = False
+        user.save()
+        return user
+
+
+class VerifyOTPSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    otp = serializers.CharField(max_length=4, min_length=4)
+
+
+class ResendOTPSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
 class CustomTokenObtainPairSerializer(serializers.Serializer):
     email = serializers.EmailField()
     password = serializers.CharField(write_only=True)

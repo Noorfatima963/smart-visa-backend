@@ -1,6 +1,8 @@
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.db import models
 from django.utils.translation import gettext_lazy as _
+from django.utils import timezone
+import random
 
 class CustomUserManager(BaseUserManager):
     """
@@ -45,3 +47,27 @@ class CustomUser(AbstractUser):
 
     def __str__(self):
         return self.email
+
+
+class EmailOTP(models.Model):
+    user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, related_name='email_otp')
+    otp = models.CharField(max_length=4)
+    expires_at = models.DateTimeField()
+    last_sent_at = models.DateTimeField(default=timezone.now)
+    is_verified = models.BooleanField(default=False)
+
+    def is_expired(self):
+        return timezone.now() > self.expires_at
+
+    def can_resend(self):
+        return (timezone.now() - self.last_sent_at).total_seconds() >= 30
+
+    def refresh_otp(self):
+        self.otp = f"{random.randint(1000, 9999)}"
+        self.expires_at = timezone.now() + timezone.timedelta(minutes=10)
+        self.last_sent_at = timezone.now()
+        self.is_verified = False
+        self.save()
+
+    def __str__(self):
+        return f"OTP for {self.user.email}"
