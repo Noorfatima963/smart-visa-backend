@@ -43,7 +43,7 @@ def send_verification_email(user, request=None):
     email = EmailMultiAlternatives(
         subject,
         text_content,
-        settings.EMAIL_HOST_USER, # From email
+        settings.DEFAULT_FROM_EMAIL, # From email
         [user.email] # To email
     )
     email.attach_alternative(html_content, "text/html")
@@ -65,8 +65,8 @@ def send_otp_email(user, otp):
     email = EmailMultiAlternatives(
         subject,
         text_content,
-        settings.EMAIL_HOST_USER,
-        [user.email]
+        settings.DEFAULT_FROM_EMAIL, # From email
+        [user.email] # To email
     )
     email.attach_alternative(html_content, "text/html")
     email.send()

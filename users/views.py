@@ -60,7 +60,9 @@ class MobileRegisterView(generics.CreateAPIView):
     permission_classes = (AllowAny,)
     serializer_class = MobileRegisterSerializer
 
-    def perform_create(self, serializer):
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
         user = serializer.save()
         otp_code = generate_otp()
         EmailOTP.objects.create(
@@ -68,12 +70,11 @@ class MobileRegisterView(generics.CreateAPIView):
             otp=otp_code,
             expires_at=timezone.now() + timezone.timedelta(minutes=10),
         )
-        send_otp_email(user, otp_code)
-
-    def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        self.perform_create(serializer)
+        try:
+            send_otp_email(user, otp_code)
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error(f"OTP email failed for {user.email}: {e}")
         return Response(
             {'message': 'Account created. Check your email for the 4-digit verification code.'},
             status=status.HTTP_201_CREATED,
