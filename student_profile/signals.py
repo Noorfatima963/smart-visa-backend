@@ -5,5 +5,7 @@ from .models import StudentProfile
 
 @receiver(post_save, sender=settings.AUTH_USER_MODEL)
 def create_student_profile(sender, instance, created, **kwargs):
+    # Skip admin-panel created users (flag set in CustomUserAdmin.save_model)
     if created and not instance.is_superuser and not instance.is_staff:
-        StudentProfile.objects.create(user=instance)
+        if not getattr(instance, '_skip_student_profile', False):
+            StudentProfile.objects.create(user=instance)

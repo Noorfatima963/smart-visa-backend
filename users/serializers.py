@@ -93,10 +93,15 @@ class CustomTokenObtainPairSerializer(serializers.Serializer):
         
             from rest_framework_simplejwt.tokens import RefreshToken
             refresh = RefreshToken.for_user(user)
+            groups = list(user.groups.values_list('name', flat=True))
 
             return {
                 'refresh': str(refresh),
                 'access': str(refresh.access_token),
+                'access_expires': refresh.access_token.lifetime.total_seconds(),
+                'is_active': user.is_active,
+                'is_staff': user.is_staff,
+                'role': groups[0] if groups else 'Student',
             }
         else:
              raise serializers.ValidationError({"detail": "Must include 'email' and 'password'."}, code='authorization')
