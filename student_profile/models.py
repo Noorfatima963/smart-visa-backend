@@ -197,3 +197,17 @@ class StudentFinancialProfile(models.Model):
 
     def __str__(self):
         return f"Financial Profile - {self.profile}"
+
+
+class AdminNote(models.Model):
+    profile    = models.ForeignKey(StudentProfile, on_delete=models.CASCADE, related_name='admin_notes')
+    admin_user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='authored_admin_notes')
+    content    = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"Note on {self.profile} by {self.admin_user.email}"

@@ -1,21 +1,34 @@
 from rest_framework import generics, status, views
+from django.db.models import Q
 from rest_framework.response import Response
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated, BasePermission
 from rest_framework_simplejwt.views import TokenObtainPairView
 from django.contrib.auth import get_user_model
 from django.utils.http import urlsafe_base64_decode
 from django.utils.encoding import force_str
 from django.contrib.auth.tokens import default_token_generator
 from django.utils import timezone
+from datetime import timedelta
 from .serializers import (
     UserRegistrationSerializer, EmailVerificationSerializer,
     CustomTokenObtainPairSerializer, MobileRegisterSerializer,
     VerifyOTPSerializer, ResendOTPSerializer,
 )
 from .utils import send_verification_email, generate_otp, send_otp_email
-from .models import EmailOTP
+from .models import EmailOTP, SIGNUP_SOURCE_CHOICES
 
 User = get_user_model()
+
+
+class IsAdminGroupUser(BasePermission):
+    """Allows access to users in the 'Admin' group or with is_staff=True."""
+    def has_permission(self, request, view):
+        return bool(
+            request.user and
+            request.user.is_authenticated and
+            (request.user.is_staff or
+             request.user.groups.filter(name='Admin').exists())
+        )
 
 class RegisterView(generics.CreateAPIView):
     queryset = User.objects.all()
@@ -145,3 +158,84 @@ class ResendOTPView(views.APIView):
         send_otp_email(user, otp_obj.otp)
 
         return Response({'message': 'A new OTP has been sent to your email.'}, status=status.HTTP_200_OK)
+
+
+class AdminStatsView(views.APIView):
+    permission_classes = [IsAuthenticated, IsAdminGroupUser]
+
+    def get(self, request):
+        from assessments.models import VisaAssessment
+        from student_profile.models import StudentProfile
+
+        total_users     = User.objects.filter(is_active=True).count()
+        total_profiles  = StudentProfile.objects.count()
+        approved        = VisaAssessment.objects.filter(status='completed').count()
+
+        # Traffic sources — count per signup_source
+        traffic_sources = {
+            source: User.objects.filter(signup_source=source).count()
+            for source, _ in SIGNUP_SOURCE_CHOICES
+        }
+
+        # Last 7 days signups for chart
+        today = timezone.now().date()
+        weekly_signups = []
+        for offset in range(6, -1, -1):
+            day = today - timedelta(days=offset)
+            count = User.objects.filter(date_joined__date=day).count()
+            weekly_signups.append({
+                'day':   day.strftime('%a'),
+                'date':  day.isoformat(),
+                'count': count,
+            })
+
+        return Response({
+            'total_users':         total_users,
+            'total_profiles':      total_profiles,
+            'approved_assessments': approved,
+            'revenue':             0,
+            'traffic_sources':     traffic_sources,
+            'weekly_signups':      weekly_signups,
+        })
+
+
+class AdminStudentListView(generics.ListAPIView):
+    permission_classes = [IsAuthenticated, IsAdminGroupUser]
+
+    def get_serializer_class(self):
+        from student_profile.serializers import AdminStudentSummarySerializer
+        return AdminStudentSummarySerializer
+
+    def get_queryset(self):
+        from student_profile.models import StudentProfile
+        qs = StudentProfile.objects.select_related(
+            'user', 'financial_profile'
+        ).prefetch_related('education_history', 'test_scores')
+
+        search = self.request.query_params.get('search', '').strip()
+        country = self.request.query_params.get('country', '').strip()
+
+        if search:
+            qs = qs.filter(
+                Q(first_name__icontains=search) |
+                Q(last_name__icontains=search) |
+                Q(user__email__icontains=search)
+            )
+        if country:
+            qs = qs.filter(target_country__icontains=country)
+
+        return qs.order_by('-created_at')
+
+
+class AdminStudentDetailView(generics.RetrieveAPIView):
+    permission_classes = [IsAuthenticated, IsAdminGroupUser]
+
+    def get_serializer_class(self):
+        from student_profile.serializers import StudentProfileSerializer
+        return StudentProfileSerializer
+
+    def get_queryset(self):
+        from student_profile.models import StudentProfile
+        return StudentProfile.objects.select_related(
+            'user', 'financial_profile'
+        ).prefetch_related('education_history', 'test_scores', 'travel_history')

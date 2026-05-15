@@ -4,11 +4,15 @@ from django.contrib.auth.password_validation import validate_password
 from .models import CustomUser
 
 class UserRegistrationSerializer(serializers.ModelSerializer):
-    password = serializers.CharField(write_only=True, required=True, validators=[validate_password])
-    
+    password    = serializers.CharField(write_only=True, required=True, validators=[validate_password])
+    utm_source  = serializers.CharField(required=False, allow_blank=True, default='')
+    utm_medium  = serializers.CharField(required=False, allow_blank=True, default='')
+    utm_campaign = serializers.CharField(required=False, allow_blank=True, default='')
+
     class Meta:
         model = CustomUser
-        fields = ('first_name', 'last_name', 'email', 'phone_number', 'password')
+        fields = ('first_name', 'last_name', 'email', 'phone_number', 'password',
+                  'utm_source', 'utm_medium', 'utm_campaign')
         extra_kwargs = {
             'first_name': {'required': True},
             'last_name': {'required': True},
@@ -17,18 +21,28 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         }
 
     def create(self, validated_data):
-        password = validated_data.pop('password')
+        from .models import SOCIAL_UTM_SOURCES
+        password     = validated_data.pop('password')
+        utm_source   = validated_data.get('utm_source', '').lower()
+        utm_medium   = validated_data.get('utm_medium', '').lower()
+
+        if utm_medium == 'referral' or utm_source == 'referral':
+            source = 'referral'
+        elif utm_source in SOCIAL_UTM_SOURCES or utm_medium == 'social':
+            source = 'social'
+        else:
+            source = 'web'
+
+        validated_data['signup_source'] = source
         user = CustomUser.objects.create_user(password=password, **validated_data)
-        
-        # Assign 'Student' group by default
+
         try:
             student_group = Group.objects.get(name='Student')
             user.groups.add(student_group)
         except Group.DoesNotExist:
-            # Handle case where groups weren't created yet or logging
             pass
-            
-        user.is_active = False # Inactive until email verified
+
+        user.is_active = False
         user.save()
         return user
 
@@ -52,6 +66,7 @@ class MobileRegisterSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         password = validated_data.pop('password')
+        validated_data['signup_source'] = 'mobile'
         user = CustomUser.objects.create_user(password=password, **validated_data)
         try:
             student_group = Group.objects.get(name='Student')

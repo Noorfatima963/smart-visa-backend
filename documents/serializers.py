@@ -14,18 +14,20 @@ class UserDocumentSerializer(serializers.ModelSerializer):
     definition_slug = serializers.CharField(write_only=True)
     slug = serializers.CharField(source='document_definition.slug', read_only=True)
     document_name = serializers.CharField(source='document_definition.name', read_only=True)
+    document_definition = DocumentDefinitionSerializer(read_only=True)
     status_display = serializers.CharField(source='get_status_display', read_only=True)
     
     class Meta:
         model = UserDocument
         fields = [
-            'id', 'definition_slug', 'slug', 'document_name', 'file', 
+            'id', 'definition_slug', 'slug', 'document_name', 'document_definition', 'file',
             'status', 'status_display', 'rejection_reason',
             'issue_date', 'expiry_date', 'verified_at', 'updated_at',
             'ai_status', 'ai_extracted_data', 'ai_rejection_reason', 'ai_confidence_score'
         ]
-        read_only_fields = ['id', 'status', 'rejection_reason', 'verified_at', 'updated_at', 
-                            'ai_status', 'ai_extracted_data', 'ai_rejection_reason', 'ai_confidence_score']
+        read_only_fields = ['id', 'status', 'rejection_reason', 'verified_at', 'updated_at',
+                            'ai_status', 'ai_extracted_data', 'ai_rejection_reason', 'ai_confidence_score',
+                            'document_definition']
 
     def to_representation(self, instance):
         # Ensure definition_slug is present in the output for frontend compatibility

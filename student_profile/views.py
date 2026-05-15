@@ -1,13 +1,25 @@
 from rest_framework import generics, permissions, status
+from rest_framework.permissions import IsAuthenticated, BasePermission
 from rest_framework.response import Response
-from .models import StudentProfile, Education, LanguageTest, StudentTravelHistory, StudentFinancialProfile
+from rest_framework.views import APIView
+from django.shortcuts import get_object_or_404
+from .models import StudentProfile, Education, LanguageTest, StudentTravelHistory, StudentFinancialProfile, AdminNote
 from .serializers import (
-    StudentProfileSerializer, 
-    EducationSerializer, 
-    LanguageTestSerializer, 
-    StudentTravelHistorySerializer, 
-    StudentFinancialProfileSerializer
+    StudentProfileSerializer,
+    EducationSerializer,
+    LanguageTestSerializer,
+    StudentTravelHistorySerializer,
+    StudentFinancialProfileSerializer,
+    AdminNoteSerializer,
 )
+
+
+class IsAdminGroupUser(BasePermission):
+    def has_permission(self, request, view):
+        return bool(
+            request.user and request.user.is_authenticated and
+            (request.user.is_staff or request.user.groups.filter(name='Admin').exists())
+        )
 
 class StudentProfileView(generics.RetrieveUpdateAPIView):
     """
@@ -96,3 +108,32 @@ class FinancialProfileView(generics.RetrieveUpdateAPIView):
         profile, _ = StudentProfile.objects.get_or_create(user=self.request.user)
         financial_profile, created = StudentFinancialProfile.objects.get_or_create(profile=profile)
         return financial_profile
+
+
+class AdminNotesView(APIView):
+    """GET / POST admin notes for a student profile."""
+    permission_classes = [IsAuthenticated, IsAdminGroupUser]
+
+    def get(self, request, profile_pk):
+        profile = get_object_or_404(StudentProfile, pk=profile_pk)
+        notes = AdminNote.objects.filter(profile=profile)
+        return Response(AdminNoteSerializer(notes, many=True).data)
+
+    def post(self, request, profile_pk):
+        profile = get_object_or_404(StudentProfile, pk=profile_pk)
+        content = request.data.get('content', '').strip()
+        if not content:
+            return Response({'detail': 'Content is required.'}, status=status.HTTP_400_BAD_REQUEST)
+        note = AdminNote.objects.create(profile=profile, admin_user=request.user, content=content)
+        return Response(AdminNoteSerializer(note).data, status=status.HTTP_201_CREATED)
+
+
+class AdminNoteDetailView(APIView):
+    """DELETE a single admin note."""
+    permission_classes = [IsAuthenticated, IsAdminGroupUser]
+
+    def delete(self, request, profile_pk, note_pk):
+        profile = get_object_or_404(StudentProfile, pk=profile_pk)
+        note = get_object_or_404(AdminNote, pk=note_pk, profile=profile)
+        note.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)

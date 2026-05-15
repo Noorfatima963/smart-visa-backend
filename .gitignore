@@ -12,3 +12,4 @@ media
 .gitignore
 db.sqlite3
 staticfiles
+branch_structure.json

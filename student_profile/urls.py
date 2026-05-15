@@ -1,13 +1,15 @@
 from django.urls import path
 from .views import (
-    StudentProfileView, 
-    EducationListCreateView, 
+    StudentProfileView,
+    EducationListCreateView,
     EducationDetailView,
     LanguageTestListCreateView,
     LanguageTestDetailView,
     TravelHistoryListCreateView,
     TravelHistoryDetailView,
-    FinancialProfileView
+    FinancialProfileView,
+    AdminNotesView,
+    AdminNoteDetailView,
 )
 
 urlpatterns = [
@@ -19,4 +21,7 @@ urlpatterns = [
     path('travel-history/', TravelHistoryListCreateView.as_view(), name='travel-history-list-create'),
     path('travel-history/<int:pk>/', TravelHistoryDetailView.as_view(), name='travel-history-detail'),
     path('financial/', FinancialProfileView.as_view(), name='financial-profile'),
+    # Admin notes
+    path('admin-notes/<int:profile_pk>/', AdminNotesView.as_view(), name='admin-notes'),
+    path('admin-notes/<int:profile_pk>/<int:note_pk>/', AdminNoteDetailView.as_view(), name='admin-note-detail'),
 ]

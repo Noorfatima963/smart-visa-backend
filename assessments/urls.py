@@ -2,6 +2,9 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
+    # ── Admin assessment (must come before router catch-alls) ─────────────────
+    path('admin/<int:profile_pk>/run/', views.AdminRunAssessmentView.as_view(), name='admin-assessment-run'),
+
     # ── Assessment lifecycle ───────────────────────────────────────────────────
     path('run/',                 views.RunAssessmentView.as_view(),    name='assessment-run'),
     path('',                     views.AssessmentHistoryView.as_view(),name='assessment-history'),

@@ -35,10 +35,25 @@ class CustomUserManager(BaseUserManager):
             raise ValueError(_('Superuser must have is_superuser=True.'))
         return self.create_user(email, password, **extra_fields)
 
+SIGNUP_SOURCE_CHOICES = [
+    ('web',      'Web App'),
+    ('mobile',   'Mobile App'),
+    ('referral', 'Referral'),
+    ('social',   'Social Media'),
+]
+
+SOCIAL_UTM_SOURCES = {'facebook', 'instagram', 'twitter', 'linkedin', 'tiktok', 'youtube', 'x'}
+
+
 class CustomUser(AbstractUser):
     username = None
     email = models.EmailField(_('email address'), unique=True)
     phone_number = models.CharField(max_length=15, blank=True, null=True)
+
+    signup_source  = models.CharField(max_length=20, choices=SIGNUP_SOURCE_CHOICES, default='web')
+    utm_source     = models.CharField(max_length=100, blank=True, default='')
+    utm_medium     = models.CharField(max_length=100, blank=True, default='')
+    utm_campaign   = models.CharField(max_length=100, blank=True, default='')
 
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = ['first_name', 'last_name', 'phone_number']

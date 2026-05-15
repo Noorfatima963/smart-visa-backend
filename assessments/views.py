@@ -1,7 +1,7 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, BasePermission
 from django.shortcuts import get_object_or_404
 from django.db.models import Q
 
@@ -407,3 +407,135 @@ class ProgramSearchView(APIView):
             'pages': (total + page_size - 1) // page_size,
             'results': results,
         })
+
+
+class IsAdminGroupUser(BasePermission):
+    def has_permission(self, request, view):
+        return bool(
+            request.user and request.user.is_authenticated and
+            (request.user.is_staff or request.user.groups.filter(name='Admin').exists())
+        )
+
+
+class AdminRunAssessmentView(APIView):
+    """
+    POST /api/assessments/admin/<profile_pk>/run/
+
+    Admin-only: run the full scoring pipeline for any student by their profile pk.
+    Uses the student's actual stored profile data (GPA, language scores, finances, etc.)
+    Returns the same match + cost structure as RunAssessmentView but does NOT persist
+    an assessment record, keeping admin runs separate from the student's own history.
+
+    Body: same as RunAssessmentView
+        { target_country, target_degree_type, target_field?, max_results? }
+    """
+    permission_classes = [IsAuthenticated, IsAdminGroupUser]
+
+    def post(self, request, profile_pk):
+        from student_profile.models import StudentProfile as DjangoProfile
+
+        serializer = RunAssessmentSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        data = serializer.validated_data
+        target_country     = data['target_country']
+        target_degree_type = data['target_degree_type']
+        target_field       = data.get('target_field', '')
+        max_results        = data.get('max_results', 20)
+
+        django_profile = get_object_or_404(DjangoProfile, pk=profile_pk)
+        student        = build_student_profile(django_profile)
+        missing        = get_missing_factors(student)
+
+        financial   = getattr(django_profile, 'financial_profile', None)
+        savings_usd = float(financial.approx_savings or 0) if financial else 0.0
+        has_sponsor = financial.has_sponsor if financial else False
+
+        programs_qs = UniversityProgram.objects.select_related('university').filter(
+            university__country=target_country,
+            degree_type=target_degree_type,
+        )
+        if target_field:
+            programs_qs = programs_qs.filter(
+                Q(program_name__icontains=target_field) |
+                Q(department__icontains=target_field)
+            )
+        programs = list(programs_qs)
+
+        if not programs:
+            return Response({
+                'status': 'no_matches',
+                'message': f'No {target_degree_type} programs found in {target_country}.',
+                'missing_factors': missing,
+                'matches': [],
+                'overall_score': 0,
+                'total_programs_evaluated': 0,
+                'total_matches_found': 0,
+                'score_breakdown': {},
+            }, status=status.HTTP_200_OK)
+
+        results = []
+        for program in programs:
+            req   = build_program_requirements(program)
+            score = calculate_probability(student, req)
+            cost  = calculate_cost(program, target_country, savings_usd, has_sponsor)
+            results.append((score, cost, program))
+
+        results.sort(key=lambda r: r[0].probability_score, reverse=True)
+
+        top_scores    = [r[0].probability_score for r in results[:5]]
+        overall_score = round(sum(top_scores) / len(top_scores), 1) if top_scores else 0
+        matches_found = sum(1 for r in results if r[0].probability_score >= 50)
+        scored        = [r[0] for r in results]
+
+        score_breakdown = {
+            'gpa':             round(sum(r.gpa_score             for r in scored) / len(scored), 1),
+            'language':        round(sum(r.language_score        for r in scored) / len(scored), 1),
+            'financial':       round(sum(r.financial_score       for r in scored) / len(scored), 1),
+            'backlogs':        round(sum(r.backlog_score         for r in scored) / len(scored), 1),
+            'visa_history':    round(sum(r.visa_history_score    for r in scored) / len(scored), 1),
+            'acceptance_rate': round(sum(r.acceptance_rate_score for r in scored) / len(scored), 1),
+        }
+
+        matches = []
+        for rank, (score_result, cost_result, program) in enumerate(results[:max_results], start=1):
+            matches.append({
+                'rank':               rank,
+                'probability_score':  score_result.probability_score,
+                'eligibility':        score_result.eligibility,
+                'match_reasons':      score_result.match_reasons,
+                'gap_reasons':        score_result.gap_reasons,
+                'cost_data':          cost_to_dict(cost_result),
+                # University
+                'university_name':    program.university.name,
+                'university_city':    program.university.city,
+                'university_state':   program.university.state_province,
+                'university_website': program.university.website,
+                'qs_world_ranking':   program.university.qs_world_ranking,
+                # Program
+                'program_name':       program.program_name,
+                'degree_type':        program.degree_type,
+                'department':         program.department,
+                'is_stem':            program.is_stem,
+                'duration_months':    program.duration_months,
+                'application_link':   program.application_link,
+                'department_link':    program.department_link,
+                'application_deadline': str(program.application_deadline) if program.application_deadline else None,
+                'tuition_fee_per_year':   float(program.tuition_fee_per_year or 0),
+                'estimated_living_cost':  float(program.estimated_living_cost or 0),
+                'acceptance_rate':        program.acceptance_rate,
+                'ielts_required':         program.ielts_required,
+                'total_scholarships':     program.total_scholarships,
+                'total_scholarship_amount': float(program.total_scholarship_amount or 0),
+            })
+
+        return Response({
+            'status':                  'completed',
+            'overall_score':           overall_score,
+            'total_programs_evaluated': len(results),
+            'total_matches_found':     matches_found,
+            'score_breakdown':         score_breakdown,
+            'missing_factors':         missing,
+            'matches':                 matches,
+        }, status=status.HTTP_200_OK)
